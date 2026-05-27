@@ -1,0 +1,54 @@
+{
+  "providers": {
+    "textedge": {
+      "account": "jvddemoadmin",
+      "password": "Qwert1234!",
+      "threshold": "300",
+      "saved": false
+    },
+    "acestar": {
+      "account": "swn2.sms@email.com",
+      "password": "cYn$wNSMS2@sLm",
+      "threshold": "200"
+    },
+    "yun_cloud": {
+      "account": "ng888",
+      "password": "CArHXI",
+      "threshold": "1000"
+    },
+    "cyy": {
+      "account": "xndSUC",
+      "password": "HiKfEu",
+      "threshold": "500"
+    },
+    "yun_cloud_ca": {
+      "account": "JVDCae",
+      "password": "ubh1WN",
+      "threshold": "1000",
+      "saved": false
+    },
+    "movider": {
+      "account": "29Pv2LSttBUI30qIBBlpXffoOmR",
+      "password": "4Z8LJfGR2jz_dD4u9x2DL2lbM4cY81",
+      "threshold": "300",
+      "saved": false
+    },
+    "movider_regional": {
+      "account": "support@jvdiamondtech.com",
+      "password": "Jvd!123456",
+      "threshold": "100000",
+      "saved": false
+    },
+    "laaffic": {
+      "account": "UbIFCBUX",
+      "password": "lnavliK1",
+      "threshold": "300",
+      "saved": false
+    }
+  },
+  "notify": {
+    "slack_webhook": "https://hooks.slack.com/triggers/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",
+    "tg_token": "",
+    "tg_chat": ""
+  }
+}

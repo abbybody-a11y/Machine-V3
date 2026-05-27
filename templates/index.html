@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>簡訊商餘額監控</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,sans-serif;background:#f5f5f5;color:#1a1a1a;}
+.header{background:#fff;border-bottom:1px solid #e5e5e5;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;}
+.header h1{font-size:18px;font-weight:600;}
+.container{max-width:900px;margin:24px auto;padding:0 16px;}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:#fff;border-radius:10px;padding:16px;border:1px solid #e5e5e5;}
+.stat label{font-size:12px;color:#888;display:block;margin-bottom:6px;}
+.stat .val{font-size:24px;font-weight:600;}
+.panel{background:#fff;border-radius:10px;padding:20px;border:1px solid #e5e5e5;margin-bottom:16px;}
+.panel h2{font-size:14px;font-weight:600;color:#444;margin-bottom:16px;}
+.prow{border:0.5px solid #e5e5e5;border-radius:10px;padding:14px 16px;margin-bottom:10px;transition:border-color .2s;}
+.prow.active{border-color:#6366f1;}
+.prow.warn{border-color:#f59e0b;}
+.prow.error{border-color:#ef4444;}
+.prow-header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.prow-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;display:inline-flex;align-items:center;}
+.badge-active{background:#eef2ff;color:#6366f1;}
+.badge-ok{background:#dcfce7;color:#16a34a;}
+.badge-warn{background:#fef9c3;color:#b45309;}
+.badge-err{background:#fee2e2;color:#dc2626;}
+.badge-off{background:#f0f0f0;color:#888;}
+.dot{width:7px;height:7px;border-radius:50%;background:#6366f1;display:inline-block;margin-right:5px;animation:pulse 2s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.tk{position:relative;width:36px;height:20px;background:#ccc;border-radius:10px;cursor:pointer;transition:background .2s;display:inline-flex;align-items:center;flex-shrink:0;}
+.tk.on{background:#6366f1;}
+.kn{position:absolute;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;}
+.tk.on .kn{transform:translateX(16px);}
+.prow-fields{margin-top:12px;padding-top:12px;border-top:0.5px solid #eee;display:grid;grid-template-columns:1fr 1fr 130px auto auto;gap:8px;align-items:center;}
+.prow-error{margin-top:10px;padding:8px 12px;background:#fee2e2;color:#991b1b;border-radius:6px;font-size:12px;display:none;}
+input[type=text],input[type=password],input[type=number]{border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:13px;width:100%;}
+input:focus{outline:none;border-color:#6366f1;}
+input[readonly]{background:#f9f9f9;color:#888;cursor:default;}
+button{border:none;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;font-weight:500;}
+.btn-primary{background:#6366f1;color:#fff;}
+.btn-primary:hover{background:#4f46e5;}
+.btn-secondary{background:#f0f0f0;color:#333;}
+.btn-secondary:hover{background:#e0e0e0;}
+.btn-save{background:#10b981;color:#fff;}
+.btn-save:hover{background:#059669;}
+.btn-edit{background:#f0f0f0;color:#555;}
+button:disabled{opacity:.5;cursor:not-allowed;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:8px 10px;color:#888;font-weight:500;border-bottom:1px solid #eee;}
+td{padding:10px;border-bottom:1px solid #f5f5f5;}
+.rt td.num{text-align:right;font-weight:500;}
+.rt td.thn{text-align:right;color:#888;}
+.rt tr.wrow{background:#fffbeb;}
+.rt tr.erow{background:#fff1f1;}
+#gs{font-size:13px;padding:10px 14px;border-radius:6px;margin-bottom:16px;display:none;}
+#gs.ok{background:#dcfce7;color:#166534;display:block;}
+#gs.err{background:#fee2e2;color:#991b1b;display:block;}
+#gs.loading{background:#eff6ff;color:#1d4ed8;display:block;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>簡訊商餘額監控</h1>
+  <span id="last-update" style="font-size:13px;color:#888;">尚未查詢</span>
+</div>
+<div class="container">
+  <div class="stats">
+    <div class="stat"><label>啟用廠商</label><div class="val" id="stat-on" style="color:#16a34a;">— / —</div></div>
+    <div class="stat"><label>查詢成功</label><div class="val" id="stat-ok">—</div></div>
+    <div class="stat"><label>低餘額警告</label><div class="val" id="stat-warn" style="color:#b45309;">—</div></div>
+  </div>
+
+  <div id="gs"></div>
+
+  <div class="panel" id="result-panel" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">查詢結果匯總</h2>
+      <button class="btn-secondary" onclick="sendToSlack()" style="font-size:12px;padding:6px 12px;">發送到 Slack</button>
+    </div>
+    <table class="rt">
+      <thead><tr><th>廠商</th><th style="text-align:right;">餘額</th><th style="text-align:right;">警示閾值</th><th style="text-align:center;">狀態</th></tr></thead>
+      <tbody id="result-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">廠商設定</h2>
+      <button class="btn-primary" id="btn-all" onclick="fetchAll()">全部查詢</button>
+    </div>
+    <div id="provider-list"></div>
+  </div>
+
+  <div class="panel">
+    <h2>通知設定</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Slack Webhook URL</label>
+        <input type="text" id="cfg-slack" placeholder="https://hooks.slack.com/...">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Telegram Bot Token</label>
+        <input type="text" id="cfg-tg-token" placeholder="Bot Token">
+      </div>
+      <div>
+        <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Telegram Chat ID</label>
+        <input type="text" id="cfg-tg-chat" placeholder="Chat ID">
+      </div>
+    </div>
+    <button class="btn-save" onclick="saveNotifyConfig()">儲存通知設定</button>
+    <span id="notify-saved" style="font-size:12px;color:#10b981;margin-left:8px;display:none;">已儲存</span>
+  </div>
+</div>
+
+<script>
+let PROVIDERS = [];
+let results = {};
+
+function showStatus(msg, type) {
+  const el = document.getElementById('gs');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function renderProviders() {
+  const cfg = JSON.parse(localStorage.getItem('provider_cfg') || '{}');
+  const enabled = JSON.parse(localStorage.getItem('provider_enabled') || '{}');
+  const list = document.getElementById('provider-list');
+
+  list.innerHTML = PROVIDERS.map(p => {
+    const pcfg = cfg[p.id] || {};
+    const isOn = enabled[p.id] !== false;
+    const saved = pcfg.saved;
+    const activeClass = isOn ? 'active' : '';
+    const badgeClass = isOn ? 'badge-active' : 'badge-off';
+    const badgeText = isOn ? '<span class="dot"></span>啟用中' : '停用';
+    const nameColor = isOn ? '' : 'color:#aaa;';
+    const fieldsDisplay = isOn ? '' : 'display:none;';
+    const accVal = saved ? '●●●●●●●●' : (pcfg.account || '');
+    const pwVal = saved ? '●●●●●●●●' : '';
+    const accReadonly = saved ? 'readonly' : '';
+    const pwReadonly = saved ? 'readonly' : '';
+    const thr = pcfg.threshold || p.threshold;
+    const actionBtn = saved
+      ? '<button class="btn-edit" onclick="editCreds(\'' + p.id + '\')">編輯</button>'
+      : '<button class="btn-save" onclick="saveCreds(\'' + p.id + '\')">儲存</button>';
+
+    return '<div class="prow ' + activeClass + '" id="row-' + p.id + '">' +
+      '<div class="prow-header">' +
+        '<div class="prow-title">' +
+          '<span style="font-size:14px;font-weight:500;' + nameColor + '">' + p.name + '</span>' +
+          '<span class="badge ' + badgeClass + '" id="status-badge-' + p.id + '">' + badgeText + '</span>' +
+          '<span class="badge badge-ok" id="bal-badge-' + p.id + '" style="display:none;"></span>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<button class="btn-secondary" style="font-size:12px;padding:5px 10px;" onclick="fetchOne(\'' + p.id + '\')" id="btn-' + p.id + '">查詢</button>' +
+          '<div class="tk ' + (isOn ? 'on' : '') + '" id="tk-' + p.id + '" onclick="toggleProvider(\'' + p.id + '\')"><div class="kn"></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="prow-fields" id="fields-' + p.id + '" style="' + fieldsDisplay + '">' +
+        '<input type="text" placeholder="帳號" id="acc-' + p.id + '" value="' + accVal + '" ' + accReadonly + '>' +
+        '<input type="password" placeholder="密碼" id="pw-' + p.id + '" value="' + pwVal + '" ' + pwReadonly + '>' +
+        '<div style="display:flex;align-items:center;gap:4px;">' +
+          '<span style="font-size:11px;color:#888;white-space:nowrap;">警示 &lt;</span>' +
+          '<input type="number" id="thr-' + p.id + '" value="' + thr + '" style="width:80px;">' +
+        '</div>' +
+        actionBtn +
+      '</div>' +
+      '<div class="prow-error" id="err-' + p.id + '"></div>' +
+    '</div>';
+  }).join('');
+
+  updateStats();
+}
+
+function saveCreds(id) {
+  const acc = document.getElementById('acc-' + id).value;
+  const pw = document.getElementById('pw-' + id).value;
+  const thr = document.getElementById('thr-' + id).value;
+  const cfg = JSON.parse(localStorage.getItem('provider_cfg') || '{}');
+  cfg[id] = { account: acc, password: pw, threshold: thr, saved: true };
+  localStorage.setItem('provider_cfg', JSON.stringify(cfg));
+  fetch('/api/provider-config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id, account: acc, password: pw, threshold: thr, saved: true })
+  });
+  renderProviders();
+}
+
+function editCreds(id) {
+  const cfg = JSON.parse(localStorage.getItem('provider_cfg') || '{}');
+  if (cfg[id]) { cfg[id].saved = false; cfg[id].account = ''; cfg[id].password = ''; }
+  localStorage.setItem('provider_cfg', JSON.stringify(cfg));
+  fetch('/api/provider-config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id, saved: false }) });
+  renderProviders();
+  setTimeout(() => {
+    document.getElementById('acc-' + id).value = '';
+    document.getElementById('pw-' + id).value = '';
+  }, 50);
+}
+
+function toggleProvider(id) {
+  const tk = document.getElementById('tk-' + id);
+  tk.classList.toggle('on');
+  const isOn = tk.classList.contains('on');
+  const enabled = JSON.parse(localStorage.getItem('provider_enabled') || '{}');
+  enabled[id] = isOn;
+  localStorage.setItem('provider_enabled', JSON.stringify(enabled));
+  renderProviders();
+}
+
+function updateStats() {
+  const enabled = JSON.parse(localStorage.getItem('provider_enabled') || '{}');
+  const on = PROVIDERS.filter(p => enabled[p.id] !== false).length;
+  document.getElementById('stat-on').textContent = on + ' / ' + PROVIDERS.length;
+}
+
+async function fetchOne(id) {
+  const btn = document.getElementById('btn-' + id);
+  const errEl = document.getElementById('err-' + id);
+  const balBadge = document.getElementById('bal-badge-' + id);
+  const row = document.getElementById('row-' + id);
+  btn.disabled = true;
+  btn.textContent = '查詢中...';
+  errEl.style.display = 'none';
+  const cfg = JSON.parse(localStorage.getItem('provider_cfg') || '{}');
+  const pcfg = cfg[id] || {};
+  try {
+    const res = await fetch('/api/fetch-one', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id, account: pcfg.account, password: pcfg.password, threshold: pcfg.threshold })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      balBadge.textContent = data.balance;
+      balBadge.style.display = '';
+      balBadge.className = 'badge ' + (data.warning ? 'badge-warn' : 'badge-ok');
+      row.classList.remove('warn', 'error');
+      if (data.warning) row.classList.add('warn');
+      results[id] = data;
+    } else {
+      errEl.textContent = '查詢失敗：' + (data.error || '未知錯誤');
+      errEl.style.display = 'block';
+      row.classList.add('error');
+      results[id] = data;
+    }
+  } catch(e) {
+    errEl.textContent = '連線錯誤：' + e.message;
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.textContent = '查詢';
+}
+
+async function fetchAll() {
+  const btn = document.getElementById('btn-all');
+  btn.disabled = true;
+  btn.textContent = '查詢中...';
+  showStatus('正在查詢所有啟用廠商，請稍候...', 'loading');
+  results = {};
+  const enabled = JSON.parse(localStorage.getItem('provider_enabled') || '{}');
+  const active = PROVIDERS.filter(p => enabled[p.id] !== false);
+  for (const p of active) {
+    await fetchOne(p.id);
+  }
+  renderResultTable();
+  const now = new Date().toLocaleString('zh-TW', {timeZone: 'Asia/Taipei'});
+  document.getElementById('last-update').textContent = '上次更新：' + now;
+  const okCount = Object.values(results).filter(r => r.ok).length;
+  const warnCount = Object.values(results).filter(r => r.ok ? r.warning : false).length;
+  document.getElementById('stat-ok').textContent = okCount + ' 家';
+  document.getElementById('stat-warn').textContent = warnCount + ' 家';
+  showStatus('查詢完成！成功 ' + okCount + ' 家，警告 ' + warnCount + ' 家', 'ok');
+  btn.disabled = false;
+  btn.textContent = '全部查詢';
+}
+
+function renderResultTable() {
+  const tbody = document.getElementById('result-tbody');
+  const panel = document.getElementById('result-panel');
+  const rows = PROVIDERS.map(p => {
+    const r = results[p.id];
+    if (!r) return '';
+    if (!r.ok) {
+      return '<tr class="erow"><td>' + p.name + '</td><td class="num" style="color:#dc2626;">查詢失敗</td><td class="thn">—</td><td style="text-align:center;"><span class="badge badge-err" style="font-size:11px;">' + (r.error || '') + '</span></td></tr>';
+    }
+    const cls = r.warning ? 'wrow' : '';
+    const clr = r.warning ? 'style="color:#b45309;"' : '';
+    const bText = r.warning ? '警告' : '正常';
+    const bCls = r.warning ? 'badge-warn' : 'badge-ok';
+    const thr = r.threshold ? Number(r.threshold).toLocaleString() : '—';
+    return '<tr class="' + cls + '"><td>' + p.name + '</td><td class="num" ' + clr + '>' + r.balance + '</td><td class="thn">' + thr + '</td><td style="text-align:center;"><span class="badge ' + bCls + '">' + bText + '</span></td></tr>';
+  }).join('');
+  tbody.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;color:#aaa;">尚無資料</td></tr>';
+  panel.style.display = '';
+}
+
+async function sendToSlack() {
+  const res = await fetch('/api/send-slack', { method: 'POST' });
+  const data = await res.json();
+  alert(data.ok ? 'Slack 發送成功！' : '發送失敗：' + data.error);
+}
+
+async function saveNotifyConfig() {
+  const data = {
+    slack_webhook: document.getElementById('cfg-slack').value,
+    tg_token: document.getElementById('cfg-tg-token').value,
+    tg_chat: document.getElementById('cfg-tg-chat').value,
+  };
+  await fetch('/api/notify-config', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+  const s = document.getElementById('notify-saved');
+  s.style.display = 'inline';
+  setTimeout(() => s.style.display = 'none', 2000);
+}
+
+async function loadNotifyConfig() {
+  const res = await fetch('/api/notify-config');
+  const cfg = await res.json();
+  if (cfg.slack_webhook) document.getElementById('cfg-slack').value = cfg.slack_webhook;
+  if (cfg.tg_token) document.getElementById('cfg-tg-token').value = cfg.tg_token;
+  if (cfg.tg_chat) document.getElementById('cfg-tg-chat').value = cfg.tg_chat;
+}
+
+fetch('/api/providers').then(r => r.json()).then(data => {
+  PROVIDERS = data;
+  renderProviders();
+});
+loadNotifyConfig();
+</script>
+</body>
+</html>
