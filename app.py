@@ -496,6 +496,52 @@ def fetch_one():
     save_history({**result, "provider": pid})
     return jsonify(result)
 
+
+@app.route("/api/fetch-all", methods=["POST"])
+def api_fetch_all():
+    """N8N 用：查詢所有啟用的廠商"""
+    cfg = Config.load()
+    providers_cfg = cfg.get("providers", {})
+    enabled = cfg.get("enabled", {})
+    results = {}
+    for p in PROVIDERS:
+        pid = p["id"]
+        if enabled.get(pid) == False:
+            continue
+        pcfg = providers_cfg.get(pid, {})
+        if not pcfg.get("account"):
+            continue
+        threshold = float(pcfg.get("threshold") or p.get("threshold", 0))
+        if pid == "textedge":
+            result = check_textedge(pcfg)
+        elif pid == "acestar":
+            result = check_acestar(pcfg)
+        elif pid == "yun_cloud":
+            result = check_yun_cloud(pcfg)
+        elif pid == "yun_cloud_ca":
+            result = check_yun_cloud_ca(pcfg)
+        elif pid == "cyy":
+            result = check_cyy(pcfg)
+        elif pid == "movider":
+            result = check_movider(pcfg)
+        elif pid == "movider_regional":
+            result = check_movider_regional(pcfg)
+        elif pid == "laaffic":
+            result = check_laaffic(pcfg)
+        else:
+            continue
+        result["ok"] = (result["status"] == "ok")
+        result["threshold"] = threshold
+        if result["ok"]:
+            try:
+                bal_num = float(''.join(c for c in result["balance"] if c.isdigit() or c == '.'))
+                result["warning"] = bal_num < threshold
+            except:
+                result["warning"] = False
+        save_history({**result, "provider": pid})
+        results[pid] = result
+    return jsonify({"ok": True, "results": results})
+
 @app.route("/api/send-slack", methods=["POST"])
 def api_send_slack():
     cfg = Config.load()
