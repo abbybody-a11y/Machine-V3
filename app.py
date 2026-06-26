@@ -1,9 +1,12 @@
 from flask import Flask, jsonify, render_template_string, request
-from scraper import check_textedge, check_acestar, check_yun_cloud, check_yun_cloud_ca, check_cyy, check_movider, check_movider_regional, check_laaffic
+from scraper import check_textedge, check_acestar, check_yun_cloud, check_yun_cloud_ca, check_cyy, check_movider, check_movider_regional, check_laaffic, check_laaffic_co
 from notifier import send_telegram, send_slack
 from config import Config
 import json, os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+TZ_TAIPEI = timezone(timedelta(hours=8))
+def now_tw(): return datetime.now(TZ_TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
 
 app = Flask(__name__)
 HISTORY_FILE = "history.json"
@@ -17,6 +20,7 @@ PROVIDERS = [
     {"id": "movider",         "name": "Movider",           "threshold": 300},
     {"id": "movider_regional","name": "Movider 區域簡訊",  "threshold": 100000},
     {"id": "laaffic",         "name": "Laaffic",           "threshold": 300},
+    {"id": "laaffic_co",      "name": "Laaffic 哥倫比亞",  "threshold": 300},
 ]
 
 def load_history():
@@ -473,11 +477,13 @@ def fetch_one():
         result = check_movider_regional(pcfg)
     elif pid == "laaffic":
         result = check_laaffic(pcfg)
+    elif pid == "laaffic_co":
+        result = check_laaffic_co(pcfg)
     else:
         result = {
             "status": "error",
             "error": f"{pid} 尚未串接，請用 F12 查詢 API 端點後設定",
-            "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "fetched_at": now_tw()
         }
 
     result["ok"] = (result["status"] == "ok")
@@ -528,6 +534,8 @@ def api_fetch_all():
             result = check_movider_regional(pcfg)
         elif pid == "laaffic":
             result = check_laaffic(pcfg)
+        elif pid == "laaffic_co":
+            result = check_laaffic_co(pcfg)
         else:
             continue
         result["ok"] = (result["status"] == "ok")
@@ -554,7 +562,7 @@ def api_send_slack():
         if pid and pid not in latest:
             latest[pid] = h
 
-    now = datetime.now().strftime("%Y/%m/%d %H:%M")
+    now = datetime.now(TZ_TAIPEI).strftime("%Y/%m/%d %H:%M")
     lines = [f"📊 簡訊商餘額報告 {now}", "─────────────────────"]
     warnings = []
 

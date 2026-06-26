@@ -1,6 +1,9 @@
 import requests
 import pyotp
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+TZ_TAIPEI = timezone(timedelta(hours=8))
+def now_tw(): return datetime.now(TZ_TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
 
 # ── TextEdge ──────────────────────────────────────────────
 TEXTEDGE_SIGN_IN = "https://auth.stacktech.org/backend/auth/v1/user/sign-in"
@@ -24,19 +27,19 @@ def check_textedge(cfg: dict) -> dict:
         token = (login_data.get("data") or {}).get("ac_token")
         if not token:
             return {"status": "error", "error": f"登入失敗：{login_data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         headers["Authorization"] = f"Bearer {token}"
         bal_resp = requests.get(TEXTEDGE_BALANCE, headers=headers, timeout=15)
         bal_data = bal_resp.json()
         amount = (bal_data.get("data") or {}).get("amount")
         if amount is None:
             return {"status": "error", "error": f"找不到餘額：{bal_data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         return {"status": "ok", "balance": f"{float(amount):.3f} USDT",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 
 # ── Acestar ───────────────────────────────────────────────
@@ -77,7 +80,7 @@ def check_acestar(cfg: dict) -> dict:
         csrf1 = get_csrf_token(session, ACESTAR_BASE)
         if not csrf1:
             return {"status": "error", "error": "無法取得 CSRF token",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         # Step 2: 登入帳號密碼
         login_resp = session.post(ACESTAR_LOGIN, data={
@@ -90,7 +93,7 @@ def check_acestar(cfg: dict) -> dict:
         csrf2 = get_csrf_token(session, ACESTAR_2FA_PAGE)
         if not csrf2:
             return {"status": "error", "error": "無法取得 2FA CSRF token",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         # Step 4: 自動產生 TOTP 驗證碼
         totp = pyotp.TOTP(ACESTAR_TOTP_SECRET)
@@ -111,14 +114,14 @@ def check_acestar(cfg: dict) -> dict:
 
         if amount is None:
             return {"status": "error", "error": f"找不到餘額：{data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         return {"status": "ok", "balance": f"{float(amount):.3f} USD",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 
 # ── 雲 Cloud ──────────────────────────────────────────────
@@ -152,12 +155,12 @@ def check_yun_cloud(cfg: dict) -> dict:
 
         if login_data.get("type") != 0:
             return {"status": "error", "error": f"登入失敗：{login_data.get('message')}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         token = login_data.get("data")
         if not token:
             return {"status": "error", "error": "未取得 token",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         # Step 2: 取得餘額
         headers["Authorization"] = f"Bearer {token}"
@@ -171,14 +174,14 @@ def check_yun_cloud(cfg: dict) -> dict:
 
         if balance is None:
             return {"status": "error", "error": f"找不到餘額：{info_data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         return {"status": "ok", "balance": f"{float(balance):.2f} ¥",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 
 # ── 雲 Cloud 加拿大 ───────────────────────────────────────
@@ -216,12 +219,12 @@ def check_cyy(cfg: dict) -> dict:
 
         if login_data.get("type") != 0:
             return {"status": "error", "error": f"登入失敗：{login_data.get('message')}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         token = login_data.get("data")
         if not token:
             return {"status": "error", "error": "未取得 token",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         headers["Authorization"] = f"Bearer {token}"
         headers["Cookie"]        = f"Authorization={token}"
@@ -234,14 +237,14 @@ def check_cyy(cfg: dict) -> dict:
 
         if balance is None:
             return {"status": "error", "error": f"找不到餘額：{info_data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
 
         return {"status": "ok", "balance": f"{float(balance):.2f} ¥",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 
 # ── Movider ───────────────────────────────────────────────
@@ -269,12 +272,12 @@ def check_movider(cfg: dict) -> dict:
         amount = data.get("amount")
         if amount is None:
             return {"status": "error", "error": f"找不到餘額：{data}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         return {"status": "ok", "balance": f"{float(amount):.4f} USD",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 # ── Movider 區域簡訊（PH wallet）─────────────────────────
 MOVIDER_AUTH_URL = "https://member.movider.co/v1/auth"
@@ -302,7 +305,7 @@ def check_movider_regional(cfg: dict) -> dict:
         token = _movider_get_token(email, password)
         if not token:
             return {"status": "error", "error": "無法取得登入 token，請確認帳密",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         resp = requests.get(MOVIDER_MEMBER_URL, headers={
             "Authorization": f"Bearer {token}",
             "Content-Type":  "application/json",
@@ -313,12 +316,12 @@ def check_movider_regional(cfg: dict) -> dict:
         amount = ph[0].get("credit_available") if ph else None
         if amount is None:
             return {"status": "error", "error": f"找不到 PH 區域餘額：{wallet}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         return {"status": "ok", "balance": f"{int(amount):,} 則",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
 
 
 # ── Laaffic ───────────────────────────────────────────────
@@ -342,10 +345,16 @@ def check_laaffic(cfg: dict) -> dict:
         data = resp.json()
         if str(data.get("status")) != "0":
             return {"status": "error", "error": f"API錯誤：{data.get('reason')}",
-                    "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    "fetched_at": now_tw()}
         balance = data.get("balance", "0")
         return {"status": "ok", "balance": f"{float(balance):.2f} USD",
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
     except Exception as e:
         return {"status": "error", "error": str(e),
-                "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                "fetched_at": now_tw()}
+
+
+# ── Laaffic 哥倫比亞 ──────────────────────────────────────
+def check_laaffic_co(cfg: dict) -> dict:
+    """同 Laaffic API，哥倫比亞帳號"""
+    return check_laaffic(cfg)
