@@ -586,6 +586,50 @@ def api_send_slack():
     ok = send_slack(notify_cfg, msg)
     return jsonify({"ok": ok})
 
+@app.route("/api/inject-balance", methods=["POST"])
+def api_inject_balance():
+    """N8N 用：從外部注入餘額（繞過 IP 限制的 provider）"""
+    data = request.json
+    pid = data.get("provider")
+    balance = data.get("balance")
+    if not pid or balance is None:
+        return jsonify({"ok": False, "error": "需要 provider 和 balance"}), 400
+
+    provider_info = next((p for p in PROVIDERS if p["id"] == pid), None)
+    if not provider_info:
+        return jsonify({"ok": False, "error": f"未知 provider: {pid}"}), 400
+
+    cfg = Config.load()
+    providers_cfg = cfg.get("providers", {})
+    pcfg = providers_cfg.get(pid, {})
+    threshold = float(pcfg.get("threshold") or provider_info.get("threshold", 0))
+
+    try:
+        bal_num = float(''.join(c for c in str(balance) if c.isdigit() or c == '.'))
+    except:
+        bal_num = 0
+
+    result = {
+        "provider": pid,
+        "status": "ok",
+        "ok": True,
+        "balance": str(balance),
+        "threshold": threshold,
+        "warning": bal_num < threshold,
+        "fetched_at": now_tw(),
+        "source": "n8n-inject"
+    }
+    save_history(result)
+
+    if result["warning"]:
+        notify_cfg = cfg.get("notify", {})
+        msg = f"⚠️ {provider_info['name']} 餘額不足\n目前：{balance}\n閾值：{threshold}"
+        send_slack(notify_cfg, msg)
+        send_telegram(notify_cfg, msg)
+
+    return jsonify({"ok": True, "result": result})
+
+
 @app.route("/api/notify-config", methods=["GET", "POST"])
 def notify_config():
     cfg = Config.load()
