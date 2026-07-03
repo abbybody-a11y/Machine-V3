@@ -564,7 +564,7 @@ def api_send_slack():
 
     now = datetime.now(TZ_TAIPEI).strftime("%Y/%m/%d %H:%M")
     lines = [f"📊 簡訊商餘額報告 {now}", "─────────────────────"]
-    warnings = []
+    warning_lines = []
 
     for p in PROVIDERS:
         r = latest.get(p["id"])
@@ -574,13 +574,18 @@ def api_send_slack():
             icon = "⚠️" if r.get("warning") else "✅"
             lines.append(f"{icon} {p['name'].ljust(12)} {r['balance']}")
             if r.get("warning"):
-                warnings.append(p["name"])
+                threshold = int(r.get("threshold", 0))
+                warning_lines.append(f"您好，{p['name']}餘額不足{threshold}，請協助加值，謝謝")
         else:
             pass  # 跟總開關の不顯示查詢失敗
 
     lines.append("─────────────────────")
-    if warnings:
-        lines.append(f"⚠️ 低餘額警告：{'、'.join(warnings)}")
+    if warning_lines:
+        lines.append("")
+        for wl in warning_lines:
+            lines.append(f"⚠️ {wl}")
+        lines.append("")
+        lines.append("<!channel>")
 
     msg = "\n".join(lines)
     ok = send_slack(notify_cfg, msg)
