@@ -12,12 +12,12 @@ def send_telegram(cfg: dict, message: str) -> bool:
     except:
         return False
 
-def send_slack(cfg: dict, message: str) -> bool:
+def send_slack(cfg: dict, message: str, has_warning: bool = False) -> bool:
     webhook = cfg.get("slack_webhook", "")
     if not webhook:
         return False
     try:
-        r = requests.post(webhook, json={"text": message}, timeout=10)
+        r = requests.post(webhook, json={"text": message, "has_warning": has_warning}, timeout=10)
         return r.status_code == 200
     except:
         return False

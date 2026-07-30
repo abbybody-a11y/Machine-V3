@@ -496,7 +496,7 @@ def fetch_one():
         if result["warning"]:
             notify_cfg = cfg.get("notify", {})
             msg = f"⚠️ {provider_info['name'] if provider_info else pid} 餘額不足\n目前：{result['balance']}\n閾值：{threshold}"
-            send_slack(notify_cfg, msg)
+            send_slack(notify_cfg, msg, has_warning=True)
             send_telegram(notify_cfg, msg)
 
     save_history({**result, "provider": pid})
@@ -584,11 +584,9 @@ def api_send_slack():
         lines.append("")
         for wl in warning_lines:
             lines.append(f"⚠️ {wl}")
-        lines.append("")
-        lines.append("<!channel>")
 
     msg = "\n".join(lines)
-    ok = send_slack(notify_cfg, msg)
+    ok = send_slack(notify_cfg, msg, has_warning=bool(warning_lines))
     return jsonify({"ok": ok})
 
 @app.route("/api/inject-balance", methods=["POST"])
@@ -629,7 +627,7 @@ def api_inject_balance():
     if result["warning"]:
         notify_cfg = cfg.get("notify", {})
         msg = f"⚠️ {provider_info['name']} 餘額不足\n目前：{balance}\n閾值：{threshold}"
-        send_slack(notify_cfg, msg)
+        send_slack(notify_cfg, msg, has_warning=True)
         send_telegram(notify_cfg, msg)
 
     return jsonify({"ok": True, "result": result})
