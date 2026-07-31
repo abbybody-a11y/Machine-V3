@@ -586,8 +586,7 @@ def api_send_slack():
             lines.append(f"⚠️ {wl}")
 
     msg = "\n".join(lines)
-    ok = send_slack(notify_cfg, msg, has_warning=bool(warning_lines))
-    return jsonify({"ok": ok})
+    return jsonify({"ok": True, "text": msg, "has_warning": bool(warning_lines)})
 
 @app.route("/api/inject-balance", methods=["POST"])
 def api_inject_balance():
