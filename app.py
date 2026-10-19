@@ -370,7 +370,7 @@ function renderResultTable() {
 }
 
 async function sendToSlack() {
-  const res = await fetch('/api/send-slack', { method: 'POST' });
+  const res = await fetch('/api/send-slack-manual', { method: 'POST' });
   const data = await res.json();
   alert(data.ok ? 'Slack 發送成功！' : '發送失敗：' + data.error);
 }
@@ -550,10 +550,8 @@ def api_fetch_all():
         results[pid] = result
     return jsonify({"ok": True, "results": results})
 
-@app.route("/api/send-slack", methods=["POST"])
-def api_send_slack():
-    cfg = Config.load()
-    notify_cfg = cfg.get("notify", {})
+def build_slack_report():
+    """組出餘額報告文字，回傳 (文字, 是否有低餘額警告)"""
     history = load_history()
 
     latest = {}
@@ -585,8 +583,28 @@ def api_send_slack():
         for wl in warning_lines:
             lines.append(f"⚠️ {wl}")
 
-    msg = "\n".join(lines)
-    return jsonify({"ok": True, "text": msg, "has_warning": bool(warning_lines)})
+    return "\n".join(lines), bool(warning_lines)
+
+
+@app.route("/api/send-slack", methods=["POST"])
+def api_send_slack():
+    """N8N 用：只回傳報告文字與 has_warning，由 n8n 決定打哪個 Slack webhook"""
+    msg, has_warning = build_slack_report()
+    return jsonify({"ok": True, "text": msg, "has_warning": has_warning})
+
+
+@app.route("/api/send-slack-manual", methods=["POST"])
+def api_send_slack_manual():
+    """後台按鈕用：直接發送到「通知設定」裡填的 Slack Webhook"""
+    cfg = Config.load()
+    notify_cfg = cfg.get("notify", {})
+    if not notify_cfg.get("slack_webhook"):
+        return jsonify({"ok": False, "error": "尚未設定 Slack Webhook，請先在通知設定填入並儲存"})
+    msg, has_warning = build_slack_report()
+    ok = send_slack(notify_cfg, msg, has_warning=has_warning)
+    if not ok:
+        return jsonify({"ok": False, "error": "Slack 沒有回應成功，請檢查 Webhook 網址"})
+    return jsonify({"ok": True})
 
 @app.route("/api/inject-balance", methods=["POST"])
 def api_inject_balance():
