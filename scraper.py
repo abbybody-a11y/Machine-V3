@@ -125,62 +125,40 @@ def check_acestar(cfg: dict) -> dict:
 
 
 # ── 雲 Cloud ──────────────────────────────────────────────
-YUN_CLOUD_BASE     = "http://47.242.85.7:9358/sms-service-api"
-YUN_CLOUD_LOGIN    = f"{YUN_CLOUD_BASE}/user/login"
-YUN_CLOUD_USERINFO = f"{YUN_CLOUD_BASE}/user/getUserInfo"
+# 改用簡訊商提供的正式餘額查詢 API（GET，不需登入）
+# 後台欄位對應：帳號 = appkey、密碼 = appsecret
+YUN_CLOUD_BALANCE_URL = "http://47.242.85.7:9090/sms/balance/v1"
+YUN_CLOUD_APPCODE     = "1000"
 
 def check_yun_cloud(cfg: dict) -> dict:
-    account  = cfg.get("account", "")
-    password = cfg.get("password", "")
-    headers = {
-        "Content-Type":   "application/json;charset=UTF-8",
-        "Accept":         "application/json, text/plain, */*",
-        "Accept-Language":"zh",
-        "Origin":         "http://47.242.85.7:9356",
-        "Referer":        "http://47.242.85.7:9356/",
-        "User-Agent":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    }
+    appkey    = cfg.get("account", "")
+    appsecret = cfg.get("password", "")
+    appcode   = cfg.get("appcode", YUN_CLOUD_APPCODE)
     try:
-        import base64
-        password_b64 = base64.b64encode(password.encode()).decode()
+        resp = requests.get(YUN_CLOUD_BALANCE_URL, params={
+            "appkey":    appkey,
+            "appsecret": appsecret,
+            "appcode":   appcode,
+        }, timeout=15)
+        data = resp.json()
 
-        # Step 1: 登入取得 token（密碼需 Base64，code/redomStr 後端不驗證）
-        login_resp = requests.post(YUN_CLOUD_LOGIN, json={
-            "username": account,
-            "password": password_b64,
-            "code":     "1234",
-            "redomStr": "123456789",
-        }, headers=headers, timeout=15)
-        login_data = login_resp.json()
-
-        if login_data.get("type") != 0:
-            return {"status": "error", "error": f"登入失敗：{login_data.get('message')}",
-                    "fetched_at": now_tw()}
-
-        token = login_data.get("data")
-        if not token:
-            return {"status": "error", "error": "未取得 token",
-                    "fetched_at": now_tw()}
-
-        # Step 2: 取得餘額
-        headers["Authorization"] = f"Bearer {token}"
-        headers["Cookie"]        = f"Authorization={token}"
-
-        info_resp = requests.post(YUN_CLOUD_USERINFO, headers=headers, timeout=15)
-        info_data = info_resp.json()
-
-        auth_user = (info_data.get("data") or {}).get("userInfo", {}).get("authUser", {})
-        balance   = auth_user.get("balance")
-
+        balance = data.get("balance")
         if balance is None:
-            return {"status": "error", "error": f"找不到餘額：{info_data}",
+            # 失敗時對方回傳格式：{"code": "F0007", "desc": "...", "result": []}
+            code = data.get("code", "")
+            desc = data.get("desc", "")
+            return {"status": "error", "error": f"API錯誤：{code} {desc}".strip(),
                     "fetched_at": now_tw()}
 
         return {"status": "ok", "balance": f"{float(balance):.2f} ¥",
                 "fetched_at": now_tw()}
 
     except Exception as e:
-        return {"status": "error", "error": str(e),
+        # 例外訊息可能含完整網址（帶 appsecret），避免顯示在後台與歷史紀錄
+        msg = str(e)
+        if appsecret:
+            msg = msg.replace(appsecret, "***")
+        return {"status": "error", "error": msg,
                 "fetched_at": now_tw()}
 
 
