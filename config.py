@@ -6,7 +6,7 @@ CONFIG_FILE = "config.json"
 DEFAULT_PROVIDER_CREDENTIALS = {
     "textedge": {"account": "jvddemoadmin", "password": "Qwert1234!"},
     "acestar":  {"account": "swn2.sms@email.com", "password": "cYn$wNSMS2@sLm"},
-    "cyy":      {"account": "xndSUC", "password": "HiKfEu"},
+    "cyy":      {"account": "xndSUC", "password": "u4apcH"},
 }
 
 class Config:
